@@ -1,14 +1,3 @@
-"""
-Robust SPRE Updater with Defensive Programming
-
-This module implements a numerically stable SPRE parameter updater that addresses:
-1. Sigma explosion via regularized MLE with adaptive ridge
-2. Negative correlation via residual feedback mechanism
-3. Temporal discontinuity via EWMA + slew rate limiting
-
-Author: SPRE Research Team
-Reference: Lorenz system experiments, arXiv:2001.10965
-"""
 
 import numpy as np
 from typing import Tuple, Optional, Dict, List
@@ -21,47 +10,27 @@ import warnings
 class RobustSPREConfig:
     """Configuration for Robust SPRE Updater."""
 
-    base_ridge: float = 1e-4           # Base ridge coefficient
-    adaptive_ridge_scale: float = 0.01  # Scale factor for adaptive ridge
-    max_ridge: float = 1.0              # Maximum ridge coefficient
+    base_ridge: float = 1e-4           
+    adaptive_ridge_scale: float = 0.01  
+    max_ridge: float = 1.0              
 
-    min_sigma: float = 1e-4             # Minimum allowed sigma
-    max_sigma: float = 100.0            # Maximum allowed sigma (prevent explosion)
+    min_sigma: float = 1e-4            
+    max_sigma: float = 100.0            
 
-    temperature: float = 1.5            # Variance inflation factor T
+    temperature: float = 1.5           
 
-    residual_window: int = 10           # Window for rolling error
-    residual_weight: float = 0.5        # Weight for residual feedback
+    residual_window: int = 10           
+    residual_weight: float = 0.5      
 
-    ewma_alpha: float = 0.1             # EWMA smoothing factor (smaller = more smooth)
-    slew_rate_limit: float = 0.15       # Max change rate (15% of previous sigma)
-
-    stability_threshold: float = 0.3    # Threshold for stability flag
+    ewma_alpha: float = 0.1             
+    slew_rate_limit: float = 0.15       
+    stability_threshold: float = 0.3    
 
     default_lengthscale: float = 1.0
 
 
 class RobustSPREUpdater:
-    """
-    Robust SPRE Parameter Updater with Defensive Programming.
 
-    Addresses three critical issues:
-    1. Numerical instability (sigma explosion) via regularized Cholesky
-    2. Overconfidence (negative correlation) via residual feedback
-    3. Temporal discontinuity via EWMA + slew rate limiting
-
-    Example:
-        updater = RobustSPREUpdater()
-
-        for t in range(len(trajectory)):
-            X_window, Y_window = get_window(t)
-            error = compute_prediction_error(t)
-
-            sigma, is_stable = updater.update(
-                X_window, Y_window,
-                current_prediction_error=error
-            )
-    """
 
     def __init__(self, config: Optional[RobustSPREConfig] = None):
         """
@@ -170,17 +139,7 @@ class RobustSPREUpdater:
         Y: np.ndarray,
         lengthscale: Optional[float] = None
     ) -> Tuple[float, Dict]:
-        """
-        Compute regularized MLE estimate of sigma.
-
-        sigma^2_MLE = (1/n) * y.T @ K^{-1} @ y
-
-        Uses Cholesky decomposition with adaptive ridge for stability.
-
-        Returns:
-            sigma: float - The estimated standard deviation
-            diagnostics: dict - Diagnostic information
-        """
+       
         X = np.atleast_2d(X)
         Y = np.atleast_1d(Y).flatten()
         n = len(Y)
@@ -225,11 +184,7 @@ class RobustSPREUpdater:
         self._residual_buffer.append(abs(error))
 
     def _get_rolling_error(self) -> float:
-        """
-        Compute rolling average of recent prediction errors.
 
-        This serves as a "data-driven" lower bound for sigma.
-        """
         if len(self._residual_buffer) == 0:
             return 0.0
 
@@ -240,14 +195,7 @@ class RobustSPREUpdater:
         sigma_mle: float,
         rolling_error: float
     ) -> float:
-        """
-        Apply residual feedback to prevent overconfidence.
 
-        sigma_final = max(sigma_MLE * T, weight * rolling_error)
-
-        This ensures that when predictions are consistently wrong,
-        the confidence interval expands accordingly.
-        """
         sigma_inflated = sigma_mle * np.sqrt(self.config.temperature)
 
         sigma_residual = self.config.residual_weight * rolling_error
@@ -258,11 +206,7 @@ class RobustSPREUpdater:
 
 
     def _apply_ewma(self, sigma_new: float) -> float:
-        """
-        Apply Exponential Weighted Moving Average (EWMA) smoothing.
 
-        sigma_t = alpha * sigma_new + (1 - alpha) * sigma_{t-1}
-        """
         alpha = self.config.ewma_alpha
 
         if self._prev_sigma is None:
@@ -271,13 +215,7 @@ class RobustSPREUpdater:
         return alpha * sigma_new + (1 - alpha) * self._prev_sigma
 
     def _apply_slew_rate_limit(self, sigma_new: float) -> float:
-        """
-        Apply slew rate limiting to prevent sudden jumps.
 
-        |sigma_t - sigma_{t-1}| <= slew_rate * sigma_{t-1}
-
-        This directly addresses the "wildly different error bars" issue.
-        """
         if self._prev_sigma is None:
             return sigma_new
 
@@ -296,27 +234,7 @@ class RobustSPREUpdater:
         current_prediction_error: Optional[float] = None,
         lengthscale: Optional[float] = None,
     ) -> Tuple[float, bool]:
-        """
-        Main update function: compute optimized sigma with all safeguards.
 
-        Parameters
-        ----------
-        X_window : np.ndarray, shape (n, d)
-            Input features for the current window
-        Y_window : np.ndarray, shape (n,)
-            Target values for the current window
-        current_prediction_error : float, optional
-            Most recent prediction error (for residual feedback)
-        lengthscale : float, optional
-            Kernel lengthscale
-
-        Returns
-        -------
-        optimized_sigma : float
-            The final, stabilized sigma estimate
-        is_stable : bool
-            Flag indicating whether the estimation was stable
-        """
         sigma_mle, mle_diagnostics = self._compute_regularized_mle_sigma(
             X_window, Y_window, lengthscale
         )
@@ -366,13 +284,7 @@ class RobustSPREUpdater:
         return self._diagnostics.copy()
 
     def get_history(self) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Get sigma history.
-
-        Returns:
-            raw_history: Raw MLE sigma values
-            final_history: Final processed sigma values
-        """
+       
         return np.array(self._raw_sigma_history), np.array(self._sigma_history)
 
 
@@ -384,33 +296,7 @@ def create_robust_updater(
     slew_rate_limit: float = 0.15,
     residual_window: int = 10,
 ) -> RobustSPREUpdater:
-    """
-    Factory function to create a configured RobustSPREUpdater.
-
-    Recommended settings based on Lorenz experiments:
-    - max_sigma=100: Prevents explosion to 2000+
-    - temperature=1.5: Moderate inflation
-    - ewma_alpha=0.1: Strong smoothing
-    - slew_rate_limit=0.15: Max 15% change per step
-    - residual_window=10: Rolling error over 10 steps
-
-    Parameters
-    ----------
-    max_sigma : float
-        Maximum allowed sigma (prevents explosion)
-    temperature : float
-        Variance inflation factor
-    ewma_alpha : float
-        EWMA smoothing factor (smaller = smoother)
-    slew_rate_limit : float
-        Maximum relative change per step
-    residual_window : int
-        Window size for rolling error computation
-
-    Returns
-    -------
-    updater : RobustSPREUpdater
-    """
+   
     config = RobustSPREConfig(
         max_sigma=max_sigma,
         temperature=temperature,

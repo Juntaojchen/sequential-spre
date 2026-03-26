@@ -1,17 +1,4 @@
-"""
-Dynamic MLE Parameter Estimation with Variance Inflation
 
-This module implements:
-1. Local MLE estimation with sliding window
-2. Variance Inflation (Cold Posterior) for overconfidence correction
-3. Stability constraints with smoothing filters
-
-References:
-- arXiv:2001.10965 - MLE bias in GP regression
-- arXiv:2008.05912 - Cold Posteriors
-
-Author: SPRE Research Team
-"""
 
 import numpy as np
 import torch
@@ -522,27 +509,7 @@ def create_spre_dynamic_estimator(
     temperature: float = 1.5,
     smoothing_alpha: float = 0.3
 ) -> DynamicMLEEstimator:
-    """
-    Factory function to create a configured DynamicMLEEstimator for SPRE.
-
-    Recommended settings based on experiments:
-    - window_size=20: Balance between local adaptation and stability
-    - temperature=1.5: Moderate inflation to cover ~95% of points
-    - smoothing_alpha=0.3: Strong smoothing to prevent jumps
-
-    Parameters
-    ----------
-    window_size : int
-        Number of recent points to use for local estimation
-    temperature : float
-        Variance inflation factor (T > 1 for wider CI)
-    smoothing_alpha : float
-        Smoothing factor (0 < alpha < 1, smaller = more smoothing)
-
-    Returns
-    -------
-    estimator : DynamicMLEEstimator
-    """
+   
     config = DynamicMLEConfig(
         window_size=window_size,
         temperature=temperature,

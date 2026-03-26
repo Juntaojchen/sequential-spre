@@ -14,33 +14,14 @@ from .helper_functions import (
 )
 
 
-EPSILON = 1e-10        # Safeguard against division by zero
-JITTER = 1e-12           # Diagonal perturbation for matrix inversion
-DEFAULT_NUM_RESTARTS = 10  # Multi-start optimization attempts
+EPSILON = 1e-10    
+JITTER = 1e-12           
+DEFAULT_NUM_RESTARTS = 10  
 
 
 class SPRE:
     def __init__(self, kernel_spec: str, dimension: int, gre_base: torch.Tensor | None = None):
-        """
-        Initialize SPRE model.
 
-        Parameters
-        ----------
-        kernel_spec : str
-            Name of the covariance kernel: "Gaussian", "GaussianARD",
-            "Matern1/2", "Matern3/2", "white".
-            If gre_base is not None, SPRE operates in GRE mode.
-        dimension : int
-            Spatial dimension d of the input space.
-        gre_base : torch.Tensor or None, shape (m, d)
-            Polynomial basis for GRE (Gauss-Richardson Extrapolation) compatibility.
-            If provided, enables GRE mode with rate function modulation.
-
-        Notes
-        -----
-        Data normalization parameters (X_norm, Y_norm, sigma_X, sigma_Y) are
-        set later via set_normalised_data().
-        """
         self.dimension = dimension
 
         self.set_kernel_spec(kernel_spec, gre_base)
@@ -53,24 +34,7 @@ class SPRE:
 
 
     def cdist_torch(self, XA: torch.Tensor, XB: torch.Tensor) -> torch.Tensor:
-        """
-        Compute pairwise Euclidean distances between rows of XA and XB.
 
-        Implements ||x_i - x_j'|| for all pairs (i, j), equivalent to
-        scipy.spatial.distance.cdist(XA, XB, 'euclidean').
-
-        Parameters
-        ----------
-        XA : torch.Tensor, shape (m, d)
-            First set of points
-        XB : torch.Tensor, shape (n, d)
-            Second set of points
-
-        Returns
-        -------
-        distances : torch.Tensor, shape (m, n)
-            Pairwise Euclidean distances
-        """
         XA = XA.to(torch.float64)
         XB = XB.to(torch.float64)
 
@@ -83,9 +47,7 @@ class SPRE:
         return torch.sqrt(nums)
 
     def set_kernel_spec(self, kernel_spec: str, gre_base: torch.Tensor | None = None):
-        """
-        设置 kernel 规格（包括 GRE 模式）。
-        """
+ 
         if gre_base is None:
             self.kernel_spec = kernel_spec
             self.kernel_base = None
@@ -97,16 +59,7 @@ class SPRE:
         self.set_kernel_default_parameters()
 
     def set_kernel_default_parameters(self):
-        """
-        设置 kernel 的初始超参数。
 
-        Raw parameters are transformed via softplus: param = ε + softplus(raw)
-
-        For amplitude σ² = 1.0 (natural after standardization):
-            softplus_inv(1.0) = log(exp(1.0) - 1) ≈ 0.5413
-
-        This initialization prevents per-T optimization from pulling σ² → 0.
-        """
         AMP_RAW_FOR_SIGMA_1 = 0.5413
 
         match self.kernel_spec:
@@ -209,43 +162,7 @@ class SPRE:
 
 
     def set_normalised_data(self, X, Y, use_mad: bool = False):
-        """
-        Normalize data using max-min scaling or MAD-based scaling.
 
-        Normalization Formula (max-min, default)
-        ----------------------------------------
-        For inputs X and outputs Y, compute scale factors:
-            σ_X = max(X) - min(X) + ε
-            σ_Y = max(Y) - min(Y) + ε
-
-        Then normalize:
-            X_norm = X / σ_X
-            Y_norm = Y / σ_Y
-
-        MAD-based Normalization (use_mad=True)
-        --------------------------------------
-        For outputs Y, use median absolute deviation:
-            Y_norm = (Y - mean(Y)) / (ε + MAD(Y))
-
-        where MAD(Y) = median(|Y - median(Y)|)
-
-        The epsilon term prevents division by zero for constant data.
-
-        Parameters
-        ----------
-        X : array-like, shape (n, d)
-            Input design points
-        Y : array-like, shape (n,)
-            Output responses
-        use_mad : bool, default=False
-            If True, use MAD-based standardization for Y
-
-        Notes
-        -----
-        Normalization improves numerical conditioning for GP inference and
-        makes lengthscale hyperparameters more interpretable.
-        MAD-based normalization is more robust to outliers.
-        """
         X = torch.as_tensor(X, dtype=torch.float64)
         Y = torch.as_tensor(Y, dtype=torch.float64).flatten()
 
@@ -267,43 +184,12 @@ class SPRE:
             self._use_mad = False
 
     def set_normalised_data_mad(self, X, Y):
-        """
-        Convenience method for MAD-based standardization.
 
-        Formula: Y_norm = (Y - mean(Y)) / (ε + MAD(Y))
-        where MAD(Y) = median(|Y - median(Y)|)
-
-        Parameters
-        ----------
-        X : array-like, shape (n, d)
-            Input design points
-        Y : array-like, shape (n,)
-            Output responses
-        """
         self.set_normalised_data(X, Y, use_mad=True)
 
 
     def extract_hyperparameters(self, x: torch.Tensor) -> dict:
-        """
-        Extract interpretable hyperparameters from raw (unconstrained) parameters.
 
-        The raw parameters are transformed via softplus to ensure positivity:
-            param = ε + softplus(x)
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Raw hyperparameters from optimization
-
-        Returns
-        -------
-        dict
-            Dictionary containing:
-            - 'amplitude': kernel amplitude σ²
-            - 'lengthscale': kernel lengthscale ℓ (or list for ARD)
-            - 'raw': original raw parameters
-            - 'kernel_spec': kernel specification name
-        """
         x = torch.as_tensor(x, dtype=torch.float64)
 
         result = {
@@ -342,23 +228,7 @@ class SPRE:
         return result
 
     def hyperparams_to_raw(self, amplitude: float, lengthscale: float | list) -> torch.Tensor:
-        """
-        Convert interpretable hyperparameters back to raw (unconstrained) space.
 
-        Inverse of softplus: softplus_inv(y) = log(exp(y) - 1)
-
-        Parameters
-        ----------
-        amplitude : float
-            Kernel amplitude σ²
-        lengthscale : float or list
-            Kernel lengthscale ℓ (or list for ARD kernels)
-
-        Returns
-        -------
-        torch.Tensor
-            Raw hyperparameters suitable for kernel evaluation
-        """
         def softplus_inv(y):
             """Inverse softplus: log(exp(y - ε) - 1), clamped for stability"""
             y_safe = max(y - EPSILON, 1e-10)
@@ -406,9 +276,7 @@ class SPRE:
         return self.cv_loss_calculation(A, X, Y, Xs, Ys, x, return_mu_cov=return_mu_cov)
 
     def check_unisolvent(self, A: torch.Tensor) -> int:
-        """
-        检查 A 是否生成 unisolvent 集（rank == m）。
-        """
+
         A = torch.as_tensor(A, dtype=torch.float64)
         m = A.shape[0]
         VA = x2fx(self.X_normalised, A)  # (n,m)
@@ -428,11 +296,7 @@ class SPRE:
         x: torch.Tensor,
         return_mu_cov: bool = False,
     ):
-        """
-        计算 (Xs, Ys) 对应的 GP+多项式模型的
-        - 若 return_mu_cov=True: 返回 mu, cov
-        - 否则返回 log-likelihood (local contribution)
-        """
+
         A = torch.as_tensor(A, dtype=torch.float64)
         X = torch.as_tensor(X, dtype=torch.float64)
         Y = torch.as_tensor(Y, dtype=torch.float64).flatten()
@@ -523,29 +387,7 @@ class SPRE:
 
 
     def mle_loss(self, x: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
-        """
-        Compute the Restricted Maximum Likelihood (REML) for GP with polynomial mean.
 
-        For GP: y ~ N(V @ beta, K)
-        The REML marginal likelihood (integrating out beta with improper prior):
-
-        log p(y|θ) = -0.5*(n-m)*log(2π) - 0.5*log|K| - 0.5*log|V^T K^{-1} V|
-                     - 0.5 * y^T P y
-
-        where P = K^{-1} - K^{-1} V (V^T K^{-1} V)^{-1} V^T K^{-1}
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Kernel hyperparameters [σ², ℓ, ...]
-        A : torch.Tensor
-            Polynomial basis multi-index set
-
-        Returns
-        -------
-        log_ml : torch.Tensor
-            Log marginal likelihood (higher is better)
-        """
         x = torch.as_tensor(x, dtype=torch.float64)
         A = torch.as_tensor(A, dtype=torch.float64)
 
@@ -595,27 +437,7 @@ class SPRE:
         return log_ml
 
     def compute_sigma_mle(self, x_no_amp: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
-        """
-        Compute the closed-form REML estimate for σ² (amplitude).
 
-        For GP with polynomial mean, the REML estimate is:
-            σ²_MLE = (1/(n-m)) * y^T P y
-
-        where P = K_φ^{-1} - K_φ^{-1} V (V^T K_φ^{-1} V)^{-1} V^T K_φ^{-1}
-        and K_φ is the kernel matrix with unit amplitude.
-
-        Parameters
-        ----------
-        x_no_amp : torch.Tensor
-            Kernel hyperparameters WITHOUT amplitude (e.g., just lengthscale)
-        A : torch.Tensor
-            Polynomial basis multi-index set
-
-        Returns
-        -------
-        sigma_sq : torch.Tensor
-            REML estimate of σ²
-        """
         X = self.X_normalised
         Y = self.Y_normalised.view(-1, 1)
         n = X.shape[0]
@@ -668,36 +490,7 @@ class SPRE:
         seed: int = 0,
         use_closed_form_sigma: bool = True,
     ) -> dict:
-        """
-        MLE-based hyperparameter optimization (alternative to CV-based).
-
-        Parameters
-        ----------
-        A : torch.Tensor
-            Polynomial basis multi-index set
-        x0 : torch.Tensor, optional
-            Initial hyperparameters
-        num_restarts : int
-            Number of random restarts for multi-start optimization
-        restart_scale : float
-            Scale of Gaussian perturbations for restarts
-        seed : int
-            Random seed for reproducibility
-        use_closed_form_sigma : bool
-            If True, use closed-form solution for σ² and only optimize other params
-
-        Returns
-        -------
-        result : dict
-            - 'x': optimal hyperparameters
-            - 'mle': log marginal likelihood at optimum (higher is better)
-
-        Notes
-        -----
-        Unlike CV which returns negative log-likelihood (lower is better),
-        MLE returns log marginal likelihood (higher is better).
-        For compatibility, we also store 'cv' = -mle.
-        """
+ 
         A = torch.as_tensor(A, dtype=torch.float64)
 
         default_params = torch.tensor(self.default_kernel_parameters, dtype=torch.float64)
@@ -776,11 +569,7 @@ class SPRE:
         return x_param.detach(), final_mle.item()
 
     def _optimize_mle_with_closed_form_sigma(self, init_x: torch.Tensor, A: torch.Tensor):
-        """
-        Internal: Optimize only lengthscale params, use closed-form for σ².
 
-        This is more efficient and often more stable than optimizing all params.
-        """
         x_no_amp = init_x[1:].clone().detach().requires_grad_(True)
 
         if x_no_amp.numel() == 0:
@@ -836,36 +625,7 @@ class SPRE:
         A: torch.Tensor,
         return_mu_and_var: bool = False,
     ) -> dict:
-        """
-        Perform SPRE extrapolation given hyperparameters and polynomial basis.
 
-        Extrapolates the GP + polynomial model to x = 0 (the Richardson limit)
-        and optionally computes LOOCV predictions at all training points.
-
-        Parameters
-        ----------
-        x : torch.Tensor, shape (p,)
-            Kernel hyperparameters [σ², ℓ, ...]
-        A : torch.Tensor, shape (m, d)
-            Polynomial basis multi-index set
-        return_mu_and_var : bool, default=False
-            If True, also compute predictions (mu, var) at x=0 and LOOCV
-            predictions (mu_cv, var_cv) at all training points
-
-        Returns
-        -------
-        result : dict
-            Dictionary containing:
-            - 'cv': LOOCV log-likelihood criterion
-            - 'mu': (if return_mu_and_var) extrapolation mean at x=0
-            - 'var': (if return_mu_and_var) extrapolation variance at x=0
-            - 'mu_cv': (if return_mu_and_var) LOOCV means at training points
-            - 'var_cv': (if return_mu_and_var) LOOCV variances at training points
-
-        Notes
-        -----
-        All returned mu/var values are in original (unnormalized) units.
-        """
         x = torch.as_tensor(x, dtype=torch.float64)
         A = torch.as_tensor(A, dtype=torch.float64)
 
@@ -889,7 +649,7 @@ class SPRE:
                 var_cv[i] = (self.nY ** 2) * cov_val[0, 0]
 
             Xs0 = torch.zeros((1, self.dimension), dtype=torch.float64)
-            Ys0 = torch.zeros((1,), dtype=torch.float64)  # 不重要
+            Ys0 = torch.zeros((1,), dtype=torch.float64)  
             mu_val0, cov_val0 = self.cv_loss_calculation(
                 A,
                 self.X_normalised,
@@ -924,41 +684,7 @@ class SPRE:
         A: torch.Tensor,
         return_mu_and_var: bool = True,
     ) -> dict:
-        """
-        Perform SPRE extrapolation with FIXED hyperparameters (no optimization).
-
-        This method is used when global hyperparameters have been learned across
-        multiple time points and should be reused without further optimization.
-
-        Parameters
-        ----------
-        amplitude : float
-            Fixed kernel amplitude σ²
-        lengthscale : float or list
-            Fixed kernel lengthscale ℓ (or list for ARD kernels)
-        A : torch.Tensor, shape (m, d)
-            Polynomial basis multi-index set
-        return_mu_and_var : bool, default=True
-            If True, compute predictions (mu, var) at x=0 and LOOCV predictions
-
-        Returns
-        -------
-        result : dict
-            Dictionary containing:
-            - 'cv': LOOCV log-likelihood criterion
-            - 'mu': extrapolation mean at x=0
-            - 'var': extrapolation variance at x=0
-            - 'mu_cv': LOOCV means at training points
-            - 'var_cv': LOOCV variances at training points
-            - 'x': raw hyperparameters used
-            - 'amplitude': the fixed amplitude
-            - 'lengthscale': the fixed lengthscale
-
-        Notes
-        -----
-        No hyperparameter optimization is performed. The provided values are
-        converted to raw space and used directly for prediction.
-        """
+      
         x_raw = self.hyperparams_to_raw(amplitude, lengthscale)
 
         out = self.perform_extrapolation(x_raw, A, return_mu_and_var=return_mu_and_var)
@@ -970,9 +696,7 @@ class SPRE:
         return out
 
     def objective(self, x_np: np.ndarray, A: np.ndarray) -> float:
-        """
-        SciPy 用的 objective：返回负的 cv（因为要最小化）。
-        """
+      
         x_t = torch.as_tensor(x_np, dtype=torch.float64)
         A_t = torch.as_tensor(A, dtype=torch.float64)
         val = self.cv_loss(x_t, A_t)
@@ -988,17 +712,7 @@ class SPRE:
         restart_scale: float = 0.5,
         seed: int = 0,
     ) -> dict:
-        """
-        Patched version:
-          - Supports user-provided initialisation x0 (raw/unconstrained space).
-          - Uses additive Gaussian perturbations in raw space for multi-start (more appropriate with softplus).
-          - Keeps your original LBFGS optimisation and "best loss" selection logic.
 
-        Notes:
-          - cv_loss returns total log-likelihood (higher is better).
-          - _optimize_torch returns (x_opt, loss_val) where loss_val = -LL (lower is better).
-          - We therefore select the smallest loss_val.
-        """
         A = torch.as_tensor(A, dtype=torch.float64)
 
         default_params = torch.tensor(self.default_kernel_parameters, dtype=torch.float64)
@@ -1047,10 +761,7 @@ class SPRE:
 
 
     def _optimize_torch(self, init_x: torch.Tensor, A: torch.Tensor):
-        """
-        内部辅助函数：使用 L-BFGS 优化单个起点
-        修复核心逻辑：最小化 Negative Log-Likelihood
-        """
+
         x_param = init_x.clone().detach().requires_grad_(True)
         
         optimizer = torch.optim.LBFGS(
@@ -1095,7 +806,7 @@ class SPRE:
         if self.kernel_base is not None:
             return self._GRE_stepwise_selection(A)
 
-        do_jit = False  # Legacy parameter (no longer used)
+        do_jit = False  
 
         order = 0
         fit = self.perform_extrapolation_optimization(A, do_jit)
@@ -1129,14 +840,13 @@ class SPRE:
                 cv_updated = fit_updated["cv"]
 
                 if cv_updated >= cv:
-                    carry_on = False  # No improvement, terminate
+                    carry_on = False 
                 else:
                     A = A_updated
                     fit = fit_updated
                     cv = cv_updated
             else:
-                carry_on = False  # No terms accepted or size limit reached
-
+                carry_on = False  
         x_opt = fit["x"]
         out = self.perform_extrapolation(x_opt, A, return_mu_and_var=True)
         return out

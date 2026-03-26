@@ -1,24 +1,3 @@
-"""
-Multivariate Richardson Extrapolation (MRE).
-
-Classical deterministic polynomial extrapolation to the origin using the
-*m* nearest training points, where m = |A| is the polynomial basis size.
-Provides a deterministic baseline (no GP, no hyperparameter tuning).
-
-Algorithm
----------
-1. Find the m points in X closest to the origin (ℓ₂ distance).
-2. Normalise those m points and their corresponding observations.
-3. Solve the square polynomial system  V @ c = y_norm  via least-squares.
-4. Evaluate the polynomial at the normalised origin to get μ = ŷ(0).
-
-References
-----------
-Richardson, L. F. (1911). The approximate arithmetical solution by finite
-differences of physical problems involving differential equations.
-Phil. Trans. R. Soc. London A, 210, 307–357.
-"""
-
 import numpy as np
 import torch
 from sklearn.neighbors import NearestNeighbors
@@ -31,25 +10,7 @@ def mre(
     X: torch.Tensor,
     Y: torch.Tensor,
 ) -> torch.Tensor:
-    """
-    Predict f(0) by Multivariate Richardson Extrapolation.
 
-    Parameters
-    ----------
-    A : (m, d)  multi-index set defining the polynomial basis.
-    X : (n, d)  training inputs (raw, not normalised).
-    Y : (n,) or (n, 1)  training outputs (raw).
-
-    Returns
-    -------
-    mu : scalar tensor  predicted f(0) in original scale.
-
-    Notes
-    -----
-    Requires m ≤ n (more data points than basis terms).
-    The least-squares solve uses LAPACK's divide-and-conquer SVD driver
-    (``gelsd``) for numerical robustness when the system is ill-conditioned.
-    """
     X = torch.as_tensor(X, dtype=torch.float64)
     Y = torch.as_tensor(Y, dtype=torch.float64).flatten()
     A = torch.as_tensor(A, dtype=torch.float64)

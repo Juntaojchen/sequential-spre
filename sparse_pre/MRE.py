@@ -32,7 +32,7 @@ def MRE(A, X, Y):
 
     ep = 1e-16
     nX = (X_sel.max(dim=0).values - X_sel.min(dim=0).values) + ep  # (d,)
-    nY = (Y_sel.max() - Y_sel.min()) + ep                          # 标量
+    nY = (Y_sel.max() - Y_sel.min()) + ep                     
 
     Xn = X_sel / nX
     Yn = Y_sel / nY
@@ -45,4 +45,4 @@ def MRE(A, X, Y):
 
     mu = nY * (eval_point @ coeffs)  # (1,1)
 
-    return mu.view(())   # 返回标量 tensor
+    return mu.view(())  

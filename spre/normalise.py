@@ -1,22 +1,3 @@
-"""
-Data normalisation for SPRE.
-
-Two normalisation strategies are provided:
-
-normalise_maxmin
-    X scaled by  (max − min),  Y scaled by (max − min).
-    Default behaviour matching the original SPRE implementation.
-
-normalise_mad
-    X scaled by (max − min),  Y centred by mean and scaled by MAD.
-    More robust to outliers; used when observations span different scales.
-
-Both return inverse-transform parameters (nX, nY, Y_mean) so that
-de-normalised predictions can be recovered in the original scale:
-
-    μ_original = μ_norm × nY  +  Y_mean
-    σ²_original = σ²_norm × nY²
-"""
 
 from typing import Tuple
 

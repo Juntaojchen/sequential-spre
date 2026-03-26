@@ -5,10 +5,7 @@ import gpytorch
 from .model_def import SPREModel
 
 def SPRE_opt(A, X, Y, k_name, training_iter=100, lr=0.1):
-    """
-    Optimize kernel parameters for SPRE using GPyTorch with L-BFGS.
-    L-BFGS is much closer to JAX's scipy.minimize(method='BFGS').
-    """
+   
 
     if not torch.is_tensor(A): A = torch.tensor(A)
     if not torch.is_tensor(X): X = torch.tensor(X)

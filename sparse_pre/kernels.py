@@ -41,21 +41,7 @@ from .utils     import cellsum
 
 
 def cdist(XA: torch.Tensor, XB: torch.Tensor) -> torch.Tensor:
-    """
-    Pairwise Euclidean distances between rows of XA and XB.
 
-    Uses the numerically stable identity  ‖a − b‖² = ‖a‖² + ‖b‖² − 2 aᵀb
-    with clamping to avoid negative values from floating-point cancellation.
-
-    Parameters
-    ----------
-    XA : (m, d)
-    XB : (n, d)
-
-    Returns
-    -------
-    D : (m, n)  distances ≥ 0
-    """
     XA = XA.to(torch.float64)
     XB = XB.to(torch.float64)
     XA_sq = (XA ** 2).sum(dim=1, keepdim=True)  # (m, 1)

@@ -28,28 +28,7 @@ def optimise_loocv(
     restart_scale: float = 0.5,
     seed:         int   = 0,
 ) -> Tuple[torch.Tensor, float]:
-    """
-    Maximise ``loocv_fn(x)`` via multi-start L-BFGS.
 
-    Parameters
-    ----------
-    loocv_fn      : callable(x: Tensor) → scalar Tensor
-        LOOCV log-likelihood (higher is better).  The function must be
-        differentiable w.r.t. ``x`` (autograd is used internally).
-    x0            : (p,) raw initial parameter vector (unconstrained space).
-    num_restarts  : number of Gaussian random restarts around ``x0``.
-    restart_scale : standard deviation of Gaussian noise added to ``x0``.
-    seed          : RNG seed for reproducible restarts.
-
-    Returns
-    -------
-    best_x   : (p,) detached tensor — optimised raw parameter vector.
-    best_val : float — LOOCV log-likelihood at ``best_x`` (higher is better).
-
-    Raises
-    ------
-    RuntimeError if every restart fails.
-    """
     x0 = torch.as_tensor(x0, dtype=torch.float64)
     gen = torch.Generator()
     gen.manual_seed(int(seed))

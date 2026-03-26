@@ -43,32 +43,7 @@ def softplus(x) -> torch.Tensor:
 
 
 def x2fx(X: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
-    """
-    Polynomial design matrix (monomial feature expansion).
 
-    Computes:
-        V[i, j] = ∏_{k=1}^{d}  X[i, k]^{A[j, k]}
-
-    This is the ``x2fx`` function from MATLAB's Statistics Toolbox, adapted
-    for arbitrary multi-index sets.
-
-    Parameters
-    ----------
-    X : torch.Tensor, shape (n, d)
-        Design points (may be normalised).
-    A : torch.Tensor, shape (m, d)
-        Multi-index set; each row α = (α₁, ..., α_d) defines the monomial
-        x₁^α₁ · x₂^α₂ · … · x_d^α_d.
-
-    Returns
-    -------
-    V : torch.Tensor, shape (n, m)
-        Polynomial design matrix.
-
-    References
-    ----------
-    Le Maître & Knio (2010), *Spectral Methods for Uncertainty Quantification*.
-    """
     if not torch.is_tensor(X):
         X = torch.tensor(X, dtype=torch.float64)
     if not torch.is_tensor(A):
@@ -80,35 +55,7 @@ def x2fx(X: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
 
 
 def stepwise(A: torch.Tensor, order: int) -> torch.Tensor:
-    """
-    Generate candidate monomials of total degree ``order``.
 
-    Starting from the current multi-index set A, the function identifies all
-    rows whose total degree equals (order − 1) and increments each coordinate
-    by 1.  Duplicates are removed via ``torch.unique``.
-
-    This is the incremental step used in greedy forward stepwise selection:
-    at each iteration we only test monomials of the next total degree.
-
-    Parameters
-    ----------
-    A     : torch.Tensor, shape (m, d), dtype int64
-        Current multi-index set.
-    order : int
-        Total degree of monomials to generate.
-
-    Returns
-    -------
-    candidates : torch.Tensor, shape (k, d)
-        New candidate monomials of total degree ``order``.
-        May be empty (shape (0, d)) if no rows in A have degree order−1.
-
-    Notes
-    -----
-    The algorithm mirrors the JAX implementation in the companion MATLAB/JAX
-    SPRE codebase.  It expands only from rows with sum == order−1 to avoid
-    generating lower-degree duplicates.
-    """
     if not torch.is_tensor(A):
         A = torch.tensor(A, dtype=torch.int64)
 

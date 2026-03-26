@@ -1,22 +1,4 @@
-"""
-GP posterior prediction at an arbitrary query point.
 
-Provides two public functions:
-
-predict_normalised
-    Low-level: given pre-built kernel / design-matrix blocks, return
-    (mu, var) in normalised space.  No data normalisation is applied here.
-
-predict_at_zero
-    High-level: builds all required kernel and basis vectors, calls
-    predict_normalised, then de-normalises the result to original scale.
-    Used by the SPRE class to extrapolate to h = 0.
-
-References
-----------
-Rasmussen & Williams (2006), *Gaussian Processes for Machine Learning*,
-  Chapter 2 (posterior GP equations).
-"""
 
 from typing import Callable, Tuple
 

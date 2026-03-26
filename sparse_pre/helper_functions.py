@@ -1,65 +1,8 @@
 
-
-
-
-    
-
-
-
-
-    
-
-
-
-
-        
-    
-
-
-    
-
-    
-
-
-
-
-    
-
-    
-
-
-    
-    
-    
-
-
-
-    
-
-
-
-
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-    
-    
-
 import torch
 
 def cellsum(arrays):
-    """
-    点对点相加：
-      - 如果传入的是 2D tensor，行为等价于 jax 版本对行求和：arrays.sum(axis=0)
-      - 如果传入的是 list[Tensor]，则逐个 tensor 做逐元素相加
-    """
+   
     if isinstance(arrays, torch.Tensor):
         if arrays.numel() == 0:
             return torch.tensor(0.0, dtype=arrays.dtype, device=arrays.device)
@@ -77,27 +20,21 @@ def cellsum(arrays):
 
 
 def remove_row(tensor, index):
-    """
-    删除第 index 行（axis=0）
-    """
+  
     if tensor.shape[0] <= 1:
         return torch.empty((0, tensor.shape[1]), dtype=tensor.dtype, device=tensor.device)
     return torch.cat([tensor[:index], tensor[index+1:]], dim=0)
 
 
 def softplus(x):
-    """
-    计算 softplus(x) = log(1 + exp(x))
-    """
+
     if not torch.is_tensor(x):
         x = torch.tensor(x, dtype=torch.float64)
     return torch.nn.functional.softplus(x)
 
 
 def stepwise(A, order):
-    """
-    计算下一阶可选的高阶交互项，行为严格对齐 JAX 版本。
-    """
+    
     if not torch.is_tensor(A):
         A = torch.tensor(A, dtype=torch.int64)
 
@@ -121,9 +58,7 @@ def stepwise(A, order):
 
 
 def white(X1, X2):
-    """
-    White kernel：相同的点给 1，不同的点给 0
-    """
+
     if not torch.is_tensor(X1):
         X1 = torch.tensor(X1)
     if not torch.is_tensor(X2):
@@ -134,12 +69,7 @@ def white(X1, X2):
 
 
 def x2fx(X, A):
-    """
-    生成多项式基：V[i,j] = ∏_k X[i,k] ** A[j,k]
-      X: (n, d)
-      A: (m, d)
-      V: (n, m)
-    """
+
     if not torch.is_tensor(X):
         X = torch.tensor(X, dtype=torch.float64)
     if not torch.is_tensor(A):

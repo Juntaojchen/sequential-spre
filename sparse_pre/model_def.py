@@ -1,28 +1,9 @@
 
-
-        
-
-        
-
-
-
-        
-        
-
-        
-        
-        
-            
-
 import torch
 import gpytorch
 from .helper_functions import x2fx
 
 class PolynomialMean(gpytorch.means.Mean):
-    """
-    自定义均值函数: mu(x) = V(x) * weights
-    用于模拟 Richardson Extrapolation 中的多项式部分。
-    """
     def __init__(self, A, input_dim):
         super().__init__()
         self.register_buffer("A", A)
@@ -43,9 +24,7 @@ class PolynomialMean(gpytorch.means.Mean):
             return (V @ self.weights).squeeze(-1) # (n,)
 
 class GREKernel(gpytorch.kernels.Kernel):
-    """
-    GRE 专用核函数: k(x1, x2) = b(x1) * k_base(x1, x2) * b(x2)
-    """
+  
     def __init__(self, base_kernel, B, **kwargs):
         super().__init__(**kwargs)
         self.base_kernel = base_kernel

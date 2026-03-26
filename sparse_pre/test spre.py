@@ -1,390 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-            
-            
-            
-            
-
-        
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-
-        
-
-
-        
-        
-
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import math
 import numpy as np
 import torch
@@ -408,26 +21,7 @@ DEFAULT_NUM_RESTARTS = 10  # Multi-start optimization attempts
 
 class SPRE:
     def __init__(self, kernel_spec: str, dimension: int, gre_base: torch.Tensor | None = None):
-        """
-        Initialize SPRE model.
-
-        Parameters
-        ----------
-        kernel_spec : str
-            Name of the covariance kernel: "Gaussian", "GaussianARD",
-            "Matern1/2", "Matern3/2", "white".
-            If gre_base is not None, SPRE operates in GRE mode.
-        dimension : int
-            Spatial dimension d of the input space.
-        gre_base : torch.Tensor or None, shape (m, d)
-            Polynomial basis for GRE (Gauss-Richardson Extrapolation) compatibility.
-            If provided, enables GRE mode with rate function modulation.
-
-        Notes
-        -----
-        Data normalization parameters (X_norm, Y_norm, sigma_X, sigma_Y) are
-        set later via set_normalised_data().
-        """
+     
         self.dimension = dimension
 
         self.set_kernel_spec(kernel_spec, gre_base)
@@ -470,9 +64,7 @@ class SPRE:
         return torch.sqrt(nums)
 
     def set_kernel_spec(self, kernel_spec: str, gre_base: torch.Tensor | None = None):
-        """
-        设置 kernel 规格（包括 GRE 模式）。
-        """
+
         if gre_base is None:
             self.kernel_spec = kernel_spec
             self.kernel_base = None
@@ -480,13 +72,11 @@ class SPRE:
             self.kernel_spec = "GRE"
             self.kernel_base = kernel_spec
 
-        self.gre_base = gre_base  # B 矩阵（或 None）
+        self.gre_base = gre_base  
         self.set_kernel_default_parameters()
 
     def set_kernel_default_parameters(self):
-        """
-        设置 kernel 的初始超参数（与 JAX 逻辑一致）。
-        """
+
         match self.kernel_spec:
             case "Gaussian":
                 self.default_kernel_parameters = [1.0, 0.1]
@@ -646,9 +236,7 @@ class SPRE:
         return self.cv_loss_calculation(A, X, Y, Xs, Ys, x, return_mu_cov=return_mu_cov)
 
     def check_unisolvent(self, A: torch.Tensor) -> int:
-        """
-        检查 A 是否生成 unisolvent 集（rank == m）。
-        """
+
         A = torch.as_tensor(A, dtype=torch.float64)
         m = A.shape[0]
         VA = x2fx(self.X_normalised, A)  # (n,m)
@@ -668,11 +256,7 @@ class SPRE:
         x: torch.Tensor,
         return_mu_cov: bool = False,
     ):
-        """
-        计算 (Xs, Ys) 对应的 GP+多项式模型的
-        - 若 return_mu_cov=True: 返回 mu, cov
-        - 否则返回 log-likelihood (local contribution)
-        """
+
         A = torch.as_tensor(A, dtype=torch.float64)
         X = torch.as_tensor(X, dtype=torch.float64)
         Y = torch.as_tensor(Y, dtype=torch.float64).flatten()
@@ -768,36 +352,7 @@ class SPRE:
         A: torch.Tensor,
         return_mu_and_var: bool = False,
     ) -> dict:
-        """
-        Perform SPRE extrapolation given hyperparameters and polynomial basis.
 
-        Extrapolates the GP + polynomial model to x = 0 (the Richardson limit)
-        and optionally computes LOOCV predictions at all training points.
-
-        Parameters
-        ----------
-        x : torch.Tensor, shape (p,)
-            Kernel hyperparameters [σ², ℓ, ...]
-        A : torch.Tensor, shape (m, d)
-            Polynomial basis multi-index set
-        return_mu_and_var : bool, default=False
-            If True, also compute predictions (mu, var) at x=0 and LOOCV
-            predictions (mu_cv, var_cv) at all training points
-
-        Returns
-        -------
-        result : dict
-            Dictionary containing:
-            - 'cv': LOOCV log-likelihood criterion
-            - 'mu': (if return_mu_and_var) extrapolation mean at x=0
-            - 'var': (if return_mu_and_var) extrapolation variance at x=0
-            - 'mu_cv': (if return_mu_and_var) LOOCV means at training points
-            - 'var_cv': (if return_mu_and_var) LOOCV variances at training points
-
-        Notes
-        -----
-        All returned mu/var values are in original (unnormalized) units.
-        """
         x = torch.as_tensor(x, dtype=torch.float64)
         A = torch.as_tensor(A, dtype=torch.float64)
 
@@ -841,9 +396,7 @@ class SPRE:
         return out
 
     def objective(self, x_np: np.ndarray, A: np.ndarray) -> float:
-        """
-        SciPy 用的 objective：返回负的 cv（因为要最小化）。
-        """
+
         x_t = torch.as_tensor(x_np, dtype=torch.float64)
         A_t = torch.as_tensor(A, dtype=torch.float64)
         val = self.cv_loss(x_t, A_t)
@@ -880,10 +433,7 @@ class SPRE:
 
 
     def _optimize_torch(self, init_x: torch.Tensor, A: torch.Tensor):
-        """
-        内部辅助函数：使用 L-BFGS 优化单个起点
-        修复核心逻辑：最小化 Negative Log-Likelihood
-        """
+
         x_param = init_x.clone().detach().requires_grad_(True)
         
         optimizer = torch.optim.LBFGS(
@@ -902,7 +452,7 @@ class SPRE:
             
             raw_ll = self.cv_loss(x_param, A)
             amp = EPSILON + torch.nn.functional.softplus(x_param[0])
-            prior_mean = -2.0  # log(0.13) 左右
+            prior_mean = -2.0 
             prior_std = 2.0
             log_amp = torch.log(amp)
             prior_penalty = 0.5 * ((log_amp - prior_mean) / prior_std)**2

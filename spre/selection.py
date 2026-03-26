@@ -1,28 +1,4 @@
-"""
-Greedy forward stepwise polynomial basis selection for SPRE.
 
-Algorithm
----------
-1. Start with the intercept-only basis  A = {0}^d.
-2. For each total degree ``order = 1, 2, …``:
-   a. Generate all candidate monomials of that degree via ``stepwise``.
-   b. For each candidate: augment A, re-optimise, accept if LOOCV improves.
-   c. Jointly accept all improvements, re-optimise, and confirm improvement.
-   d. Stop when no improvement is found or the size limit (n − 1) is reached.
-
-The caller supplies an ``optimise_fn(A) → (x_opt, neg_ll)`` callback so that
-this module remains independent of the kernel choice.
-
-Public functions
-----------------
-stepwise_selection   Full greedy search (standard SPRE).
-check_unisolvent     Rank test for the polynomial design matrix.
-
-References
-----------
-Le Maître & Knio (2010), *Spectral Methods for Uncertainty Quantification*,
-  Chapter 3 (greedy basis selection).
-"""
 
 from typing import Callable, Tuple
 
@@ -54,27 +30,7 @@ def stepwise_selection(
     dimension:   int,
     n_train:     int,
 ) -> Tuple[torch.Tensor, dict]:
-    """
-    Greedy forward selection of polynomial basis A.
 
-    Parameters
-    ----------
-    optimise_fn : callable(A: Tensor) → (x_opt: Tensor, neg_ll: float)
-        Optimises LOOCV hyperparameters for the given basis and returns:
-          - ``x_opt``  : optimal raw hyperparameter vector.
-          - ``neg_ll`` : minimised *negative* LOOCV log-likelihood
-                         (lower is better, i.e. higher LOOCV = better).
-    X_norm      : (n, d)  normalised training inputs (for unisolvency checks).
-    dimension   : int     input dimensionality d.
-    n_train     : int     number of training points; size limit = n − 1.
-
-    Returns
-    -------
-    A_opt : (m, d) torch.Tensor  selected multi-index set.
-    fit   : dict with keys:
-              'x'  (p,) optimal raw hyperparameters for A_opt.
-              'cv' scalar tensor — neg-ll at the optimum (lower = better).
-    """
     A       = torch.zeros(1, dimension, dtype=torch.int64)
     x_opt, neg_ll = optimise_fn(A)
     fit     = {"x": x_opt, "cv": torch.tensor(neg_ll, dtype=torch.float64)}
