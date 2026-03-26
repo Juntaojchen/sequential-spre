@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Robust SPRE Updater with Defensive Programming
 
@@ -22,30 +21,23 @@ import warnings
 class RobustSPREConfig:
     """Configuration for Robust SPRE Updater."""
 
-    # Regularization parameters
     base_ridge: float = 1e-4           # Base ridge coefficient
     adaptive_ridge_scale: float = 0.01  # Scale factor for adaptive ridge
     max_ridge: float = 1.0              # Maximum ridge coefficient
 
-    # MLE bounds
     min_sigma: float = 1e-4             # Minimum allowed sigma
     max_sigma: float = 100.0            # Maximum allowed sigma (prevent explosion)
 
-    # Variance inflation (Cold Posterior)
     temperature: float = 1.5            # Variance inflation factor T
 
-    # Residual feedback parameters
     residual_window: int = 10           # Window for rolling error
     residual_weight: float = 0.5        # Weight for residual feedback
 
-    # Smoothing parameters
     ewma_alpha: float = 0.1             # EWMA smoothing factor (smaller = more smooth)
     slew_rate_limit: float = 0.15       # Max change rate (15% of previous sigma)
 
-    # Stability detection
     stability_threshold: float = 0.3    # Threshold for stability flag
 
-    # Kernel parameters
     default_lengthscale: float = 1.0
 
 
@@ -82,15 +74,12 @@ class RobustSPREUpdater:
         """
         self.config = config or RobustSPREConfig()
 
-        # State variables
         self._prev_sigma: Optional[float] = None
         self._sigma_history: List[float] = []
         self._raw_sigma_history: List[float] = []
 
-        # Residual feedback buffer (circular buffer)
         self._residual_buffer: deque = deque(maxlen=self.config.residual_window)
 
-        # Diagnostics
         self._diagnostics: Dict = {}
 
     def reset(self):
@@ -101,9 +90,6 @@ class RobustSPREUpdater:
         self._residual_buffer.clear()
         self._diagnostics = {}
 
-    # ================================================================
-    # 1. REGULARIZED MLE ESTIMATION (Cholesky + Adaptive Ridge)
-    # ================================================================
 
     def _compute_kernel_matrix(
         self,
@@ -120,12 +106,10 @@ class RobustSPREUpdater:
 
         n = X.shape[0]
 
-        # Compute pairwise squared distances
         X_sq = np.sum(X ** 2, axis=1, keepdims=True)
         dist_sq = X_sq + X_sq.T - 2 * np.dot(X, X.T)
         dist_sq = np.maximum(dist_sq, 0)  # Numerical stability
 
-        # RBF kernel (unit amplitude - sigma will be estimated separately)
         K = np.exp(-dist_sq / (2 * lengthscale ** 2 + 1e-10))
 
         return K
@@ -139,11 +123,9 @@ class RobustSPREUpdater:
         n = K.shape[0]
         trace_K = np.trace(K)
 
-        # Adaptive ridge: base + scale * (trace / n)
         ridge = self.config.base_ridge + \
                 self.config.adaptive_ridge_scale * (trace_K / n)
 
-        # Clamp to maximum
         ridge = min(ridge, self.config.max_ridge)
 
         return ridge
@@ -163,19 +145,15 @@ class RobustSPREUpdater:
         K_reg = K + ridge * np.eye(n)
 
         try:
-            # Cholesky decomposition: K_reg = L @ L.T
             L = np.linalg.cholesky(K_reg)
 
-            # Solve L @ z = y
             z = np.linalg.solve(L, y)
 
-            # Solve L.T @ alpha = z
             alpha = np.linalg.solve(L.T, z)
 
             return alpha, True
 
         except np.linalg.LinAlgError:
-            # Fallback: increase ridge and use pseudoinverse
             warnings.warn(f"Cholesky failed with ridge={ridge:.2e}, using fallback")
 
             K_reg = K + self.config.max_ridge * np.eye(n)
@@ -183,7 +161,6 @@ class RobustSPREUpdater:
                 alpha = np.linalg.solve(K_reg, y)
                 return alpha, False
             except np.linalg.LinAlgError:
-                # Last resort: pseudoinverse
                 alpha = np.linalg.lstsq(K_reg, y, rcond=None)[0]
                 return alpha, False
 
@@ -204,7 +181,6 @@ class RobustSPREUpdater:
             sigma: float - The estimated standard deviation
             diagnostics: dict - Diagnostic information
         """
-        # Ensure correct shapes
         X = np.atleast_2d(X)
         Y = np.atleast_1d(Y).flatten()
         n = len(Y)
@@ -212,33 +188,25 @@ class RobustSPREUpdater:
         if n < 2:
             return self.config.min_sigma, {'status': 'insufficient_data'}
 
-        # Standardize data (critical for numerical stability!)
         X_mean, X_std = X.mean(axis=0), X.std(axis=0) + 1e-10
         Y_mean, Y_std = Y.mean(), Y.std() + 1e-10
 
         X_norm = (X - X_mean) / X_std
         Y_norm = (Y - Y_mean) / Y_std
 
-        # Compute kernel matrix
         K = self._compute_kernel_matrix(X_norm, lengthscale)
 
-        # Compute adaptive ridge
         ridge = self._compute_adaptive_ridge(K)
 
-        # Solve for alpha = K^{-1} @ y using Cholesky
         alpha, cholesky_success = self._stable_cholesky_solve(K, Y_norm, ridge)
 
-        # Compute sigma^2 = (1/n) * y.T @ alpha
         sigma_sq_normalized = np.dot(Y_norm, alpha) / n
 
-        # Ensure positive
         sigma_sq_normalized = max(sigma_sq_normalized, 1e-10)
 
-        # Denormalize: sigma_original = sigma_normalized * Y_std
         sigma_sq = sigma_sq_normalized * (Y_std ** 2)
         sigma = np.sqrt(sigma_sq)
 
-        # Clamp to valid range
         sigma = np.clip(sigma, self.config.min_sigma, self.config.max_sigma)
 
         diagnostics = {
@@ -251,9 +219,6 @@ class RobustSPREUpdater:
 
         return sigma, diagnostics
 
-    # ================================================================
-    # 2. RESIDUAL FEEDBACK MECHANISM (Fix Overconfidence)
-    # ================================================================
 
     def _update_residual_buffer(self, error: float):
         """Add prediction error to the rolling buffer."""
@@ -283,20 +248,14 @@ class RobustSPREUpdater:
         This ensures that when predictions are consistently wrong,
         the confidence interval expands accordingly.
         """
-        # Apply temperature (variance inflation)
         sigma_inflated = sigma_mle * np.sqrt(self.config.temperature)
 
-        # Residual-based lower bound
         sigma_residual = self.config.residual_weight * rolling_error
 
-        # Take maximum to prevent overconfidence
         sigma_combined = max(sigma_inflated, sigma_residual)
 
         return sigma_combined
 
-    # ================================================================
-    # 3. EWMA + SLEW RATE LIMITING (Temporal Smoothness)
-    # ================================================================
 
     def _apply_ewma(self, sigma_new: float) -> float:
         """
@@ -324,15 +283,11 @@ class RobustSPREUpdater:
 
         max_change = self.config.slew_rate_limit * self._prev_sigma
 
-        # Clamp the change
         delta = sigma_new - self._prev_sigma
         delta_clamped = np.clip(delta, -max_change, max_change)
 
         return self._prev_sigma + delta_clamped
 
-    # ================================================================
-    # MAIN UPDATE FUNCTION
-    # ================================================================
 
     def update(
         self,
@@ -362,33 +317,27 @@ class RobustSPREUpdater:
         is_stable : bool
             Flag indicating whether the estimation was stable
         """
-        # ---- Step 1: Regularized MLE ----
         sigma_mle, mle_diagnostics = self._compute_regularized_mle_sigma(
             X_window, Y_window, lengthscale
         )
         self._raw_sigma_history.append(sigma_mle)
 
-        # ---- Step 2: Residual Feedback ----
         if current_prediction_error is not None:
             self._update_residual_buffer(current_prediction_error)
 
         rolling_error = self._get_rolling_error()
         sigma_feedback = self._apply_residual_feedback(sigma_mle, rolling_error)
 
-        # ---- Step 3: EWMA Smoothing ----
         sigma_smoothed = self._apply_ewma(sigma_feedback)
 
-        # ---- Step 4: Slew Rate Limiting ----
         sigma_limited = self._apply_slew_rate_limit(sigma_smoothed)
 
-        # ---- Step 5: Final Bounds Check ----
         sigma_final = np.clip(
             sigma_limited,
             self.config.min_sigma,
             self.config.max_sigma
         )
 
-        # ---- Determine Stability ----
         is_stable = True
         if self._prev_sigma is not None:
             relative_change = abs(sigma_final - self._prev_sigma) / (self._prev_sigma + 1e-10)
@@ -396,11 +345,9 @@ class RobustSPREUpdater:
 
         is_stable = is_stable and mle_diagnostics.get('cholesky_success', True)
 
-        # ---- Update State ----
         self._prev_sigma = sigma_final
         self._sigma_history.append(sigma_final)
 
-        # ---- Store Diagnostics ----
         self._diagnostics = {
             'sigma_mle': sigma_mle,
             'sigma_feedback': sigma_feedback,
@@ -429,9 +376,6 @@ class RobustSPREUpdater:
         return np.array(self._raw_sigma_history), np.array(self._sigma_history)
 
 
-# ================================================================
-# FACTORY FUNCTION
-# ================================================================
 
 def create_robust_updater(
     max_sigma: float = 100.0,
@@ -477,22 +421,17 @@ def create_robust_updater(
     return RobustSPREUpdater(config)
 
 
-# ================================================================
-# EXAMPLE USAGE
-# ================================================================
 
 if __name__ == "__main__":
     print("Robust SPRE Updater - Example")
     print("=" * 50)
 
-    # Generate synthetic data
     np.random.seed(42)
     n_points = 100
     t = np.linspace(0, 5, n_points)
     y_true = np.sin(2 * np.pi * t) * np.exp(-0.3 * t)
     y_obs = y_true + 0.1 * np.random.randn(n_points)
 
-    # Create updater
     updater = create_robust_updater(
         max_sigma=10.0,
         temperature=1.5,
@@ -506,16 +445,13 @@ if __name__ == "__main__":
     stability_flags = []
 
     for i in range(window_size, n_points):
-        # Get window
         X_window = t[i-window_size:i].reshape(-1, 1)
         Y_window = y_obs[i-window_size:i]
 
-        # Compute prediction error (simple lag-1)
         pred = y_obs[i-1]
         error = y_true[i] - pred
         errors.append(abs(error))
 
-        # Update sigma
         sigma, is_stable = updater.update(
             X_window, Y_window,
             current_prediction_error=error
@@ -526,7 +462,6 @@ if __name__ == "__main__":
     sigmas = np.array(sigmas)
     errors = np.array(errors)
 
-    # Get history for comparison
     raw_sigmas, final_sigmas = updater.get_history()
 
     print(f"\nResults:")
@@ -535,7 +470,6 @@ if __name__ == "__main__":
     print(f"  Max sigma jump:   {np.abs(np.diff(final_sigmas)).max():.4f}")
     print(f"  Stability rate:   {np.mean(stability_flags)*100:.1f}%")
 
-    # Error-sigma correlation
     corr = np.corrcoef(errors, sigmas)[0, 1]
     print(f"  Error-sigma corr: {corr:.3f}")
 

@@ -21,9 +21,6 @@ import torch
 from .constants import DEFAULT_NUM_RESTARTS
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Public API
-# ─────────────────────────────────────────────────────────────────────────────
 def optimise_loocv(
     loocv_fn:     Callable[[torch.Tensor], torch.Tensor],
     x0:           torch.Tensor,
@@ -57,7 +54,6 @@ def optimise_loocv(
     gen = torch.Generator()
     gen.manual_seed(int(seed))
 
-    # Build list of starting points: base + num_restarts perturbations
     starting_points = [x0.clone()]
     for _ in range(int(num_restarts)):
         noise = torch.randn(x0.shape, dtype=x0.dtype, generator=gen) * float(restart_scale)
@@ -85,9 +81,6 @@ def optimise_loocv(
     return best_x, best_val
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Internal helper
-# ─────────────────────────────────────────────────────────────────────────────
 def _lbfgs_step(
     loocv_fn: Callable[[torch.Tensor], torch.Tensor],
     init_x:   torch.Tensor,

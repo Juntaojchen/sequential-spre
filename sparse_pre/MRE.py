@@ -17,7 +17,6 @@ def MRE(A, X, Y):
         torch.Tensor (0-dim scalar): predicted f(0)
     """
 
-    # ---- 1. 转成 double tensor ----
     X = torch.as_tensor(X, dtype=torch.float64)
     Y = torch.as_tensor(Y, dtype=torch.float64).flatten()
     A = torch.as_tensor(A, dtype=torch.float64)
@@ -25,14 +24,12 @@ def MRE(A, X, Y):
     n_train, d = X.shape
     m = A.shape[0]
 
-    # ---- 2. 找到距离 0 最近的 m 个点 ----
     nbrs = NearestNeighbors(n_neighbors=m).fit(X.cpu().numpy())
     idx = nbrs.kneighbors(np.zeros((1, d)), return_distance=False).flatten()
 
     X_sel = X[idx]      # (m, d)
     Y_sel = Y[idx]      # (m,)
 
-    # ---- 3. 归一化 (和 JAX 完全一致) ----
     ep = 1e-16
     nX = (X_sel.max(dim=0).values - X_sel.min(dim=0).values) + ep  # (d,)
     nY = (Y_sel.max() - Y_sel.min()) + ep                          # 标量
@@ -40,15 +37,12 @@ def MRE(A, X, Y):
     Xn = X_sel / nX
     Yn = Y_sel / nY
 
-    # ---- 4. 设计矩阵 & 评价点 ----
     V = x2fx(Xn, A)                                           # (m, m)
     eval_point = x2fx(torch.zeros((1, d), dtype=torch.float64), A)  # (1, m)
 
-    # ---- 5. 最小二乘 (SVD 驱动，接近 JAX) ----
     sol = torch.linalg.lstsq(V, Yn.unsqueeze(1), driver='gelsd')
     coeffs = sol.solution  # (m, 1)
 
-    # ---- 6. 预测 f(0) ----
     mu = nY * (eval_point @ coeffs)  # (1,1)
 
     return mu.view(())   # 返回标量 tensor

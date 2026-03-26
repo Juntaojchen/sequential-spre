@@ -32,9 +32,6 @@ from tqdm import tqdm
 from .basis import stepwise, x2fx
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
 def check_unisolvent(X_norm: torch.Tensor, A: torch.Tensor) -> bool:
     """
     Return True iff the design matrix V = x2fx(X_norm, A) has full column rank.
@@ -51,9 +48,6 @@ def check_unisolvent(X_norm: torch.Tensor, A: torch.Tensor) -> bool:
     return int(torch.linalg.matrix_rank(VA).item()) == A.shape[0]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main algorithm
-# ─────────────────────────────────────────────────────────────────────────────
 def stepwise_selection(
     optimise_fn: Callable[[torch.Tensor], Tuple[torch.Tensor, float]],
     X_norm:      torch.Tensor,
@@ -81,7 +75,6 @@ def stepwise_selection(
               'x'  (p,) optimal raw hyperparameters for A_opt.
               'cv' scalar tensor — neg-ll at the optimum (lower = better).
     """
-    # Initialise with intercept-only basis
     A       = torch.zeros(1, dimension, dtype=torch.int64)
     x_opt, neg_ll = optimise_fn(A)
     fit     = {"x": x_opt, "cv": torch.tensor(neg_ll, dtype=torch.float64)}

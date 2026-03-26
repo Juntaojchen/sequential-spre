@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Dynamic MLE Parameter Estimation with Variance Inflation
 
@@ -21,7 +20,6 @@ from typing import Optional, Tuple, Dict, List
 from dataclasses import dataclass
 
 
-# Numerical stability constants
 EPSILON = 1e-10
 JITTER = 1e-8
 
@@ -65,12 +63,10 @@ class DynamicMLEEstimator:
         """
         self.config = config or DynamicMLEConfig()
 
-        # State variables for smoothing
         self._prev_sigma: Optional[float] = None
         self._sigma_history: List[float] = []
         self._raw_sigma_history: List[float] = []  # Before smoothing
 
-        # Standardization parameters (updated each window)
         self._X_mean: Optional[np.ndarray] = None
         self._X_std: Optional[np.ndarray] = None
         self._Y_mean: Optional[float] = None
@@ -134,12 +130,10 @@ class DynamicMLEEstimator:
         """
         n = X.shape[0]
 
-        # Compute pairwise squared distances
         X_sq = np.sum(X ** 2, axis=1, keepdims=True)
         dist_sq = X_sq + X_sq.T - 2 * X @ X.T
         dist_sq = np.maximum(dist_sq, 0)  # Numerical stability
 
-        # RBF kernel
         K = amplitude * np.exp(-dist_sq / (2 * lengthscale ** 2 + EPSILON))
 
         return K
@@ -160,18 +154,14 @@ class DynamicMLEEstimator:
         """
         n = K.shape[0]
 
-        # Add jitter for numerical stability
         K_reg = K + JITTER * np.eye(n)
 
         if self.config.use_cholesky:
             try:
-                # Cholesky decomposition: K = L @ L.T
                 L = np.linalg.cholesky(K_reg)
-                # Solve L @ L.T @ K_inv = I
                 L_inv = np.linalg.solve(L, np.eye(n))
                 K_inv = L_inv.T @ L_inv
             except np.linalg.LinAlgError:
-                # Fallback to regularized inverse
                 K_reg = K + 1e-4 * np.eye(n)
                 K_inv = np.linalg.inv(K_reg)
         else:
@@ -206,7 +196,6 @@ class DynamicMLEEstimator:
         sigma_sq : float
             MLE estimate of σ²
         """
-        # Ensure correct shapes
         X = np.atleast_2d(X)
         Y = np.atleast_1d(Y).flatten()
         n = len(Y)
@@ -214,20 +203,15 @@ class DynamicMLEEstimator:
         if n < 2:
             return self.config.min_sigma ** 2
 
-        # Standardization
         if self.config.use_standardization:
             X, Y = self._standardize(X, Y)
 
-        # Compute kernel with unit amplitude
         K = self._compute_kernel_matrix(X, lengthscale=lengthscale, amplitude=1.0)
 
-        # Stable inverse
         K_inv = self._stable_inverse(K)
 
-        # MLE closed-form: σ²_MLE = (1/n) y^T K^{-1} y
         sigma_sq = (Y @ K_inv @ Y) / n
 
-        # Clamp to valid range
         sigma_sq = np.clip(sigma_sq, self.config.min_sigma ** 2, self.config.max_sigma ** 2)
 
         return float(sigma_sq)
@@ -313,27 +297,22 @@ class DynamicMLEEstimator:
             - 'sigma_raw': raw MLE sigma (before inflation/smoothing)
             - 'sigma_inflated': sigma after inflation (before smoothing)
         """
-        # Step 1: Compute raw MLE sigma
         sigma_sq_mle = self.compute_mle_sigma(X, Y, lengthscale)
         sigma_raw = np.sqrt(sigma_sq_mle)
 
-        # Store raw sigma for diagnostics
         self._raw_sigma_history.append(sigma_raw)
 
-        # Step 2: Apply variance inflation (Cold Posterior)
         if apply_inflation:
             sigma_sq_inflated = self.apply_variance_inflation(sigma_sq_mle)
         else:
             sigma_sq_inflated = sigma_sq_mle
         sigma_inflated = np.sqrt(sigma_sq_inflated)
 
-        # Step 3: Apply smoothing filter
         if apply_smoothing:
             sigma_final = self.apply_smoothing(sigma_inflated)
         else:
             sigma_final = sigma_inflated
 
-        # Store final sigma
         self._sigma_history.append(sigma_final)
 
         return {
@@ -401,24 +380,20 @@ class DynamicMLEVisualizer:
         """
         fig, ax = plt.subplots(figsize=figsize)
 
-        # Plot confidence interval
         lower = y_pred - n_std * sigma
         upper = y_pred + n_std * sigma
         ax.fill_between(t, lower, upper, alpha=0.3, color='red',
                        label=f'{int(n_std*2)}σ CI (Inflated)')
 
-        # Plot predictions and true values
         ax.plot(t, y_true, 'b-', lw=1.5, label='True trajectory', alpha=0.8)
         ax.plot(t, y_pred, 'r--', lw=1.5, label='Prediction')
 
-        # Highlight points outside CI
         outside = np.abs(y_true - y_pred) > n_std * sigma
         if outside.any():
             ax.scatter(t[outside], y_true[outside], c='orange', s=50,
                       marker='x', linewidths=2, zorder=5,
                       label=f'Outside CI ({outside.sum()}/{len(t)})')
 
-        # Coverage statistics
         coverage = 1 - outside.mean()
         ax.set_title(f'{title}\nCoverage: {coverage*100:.1f}%')
         ax.set_xlabel('Time')
@@ -456,7 +431,6 @@ class DynamicMLEVisualizer:
         """
         fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-        # Raw vs Smoothed
         ax1 = axes[0]
         ax1.plot(t, sigma_raw, 'b-', alpha=0.5, lw=1, label='Raw MLE')
         ax1.plot(t, sigma_smoothed, 'r-', lw=2, label='Smoothed + Inflated')
@@ -466,7 +440,6 @@ class DynamicMLEVisualizer:
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
-        # Sigma jumps (derivative)
         ax2 = axes[1]
         if len(t) > 1:
             jumps_raw = np.abs(np.diff(sigma_raw))
@@ -505,18 +478,15 @@ class DynamicMLEVisualizer:
 
         ax.scatter(errors, sigmas, c='blue', alpha=0.6, s=50)
 
-        # Correlation
         if len(errors) > 2:
             corr = np.corrcoef(errors, sigmas)[0, 1]
 
-            # Trend line
             z = np.polyfit(errors, sigmas, 1)
             p = np.poly1d(z)
             x_line = np.linspace(errors.min(), errors.max(), 50)
             ax.plot(x_line, p(x_line), 'k--', lw=2, alpha=0.7,
                    label=f'Trend (slope={z[0]:.3f})')
 
-            # Mark overconfident region
             med_err = np.median(errors)
             med_sig = np.median(sigmas)
             overconf = (errors > med_err) & (sigmas < med_sig)
@@ -546,9 +516,6 @@ class DynamicMLEVisualizer:
         return fig
 
 
-# ============================================================
-# Integration with SPRE
-# ============================================================
 
 def create_spre_dynamic_estimator(
     window_size: int = 20,
@@ -586,15 +553,11 @@ def create_spre_dynamic_estimator(
     return DynamicMLEEstimator(config)
 
 
-# ============================================================
-# Example usage
-# ============================================================
 
 if __name__ == "__main__":
     print("Dynamic MLE Estimator - Example Usage")
     print("=" * 50)
 
-    # Generate synthetic data
     np.random.seed(42)
     n_points = 100
     t = np.linspace(0, 5, n_points)
@@ -602,27 +565,22 @@ if __name__ == "__main__":
     noise = 0.1 * np.random.randn(n_points)
     y_obs = y_true + noise
 
-    # Create estimator
     estimator = create_spre_dynamic_estimator(
         window_size=15,
         temperature=1.5,
         smoothing_alpha=0.3
     )
 
-    # Simulate prediction loop with sliding window
     window_size = 15
     predictions = []
     sigmas = []
 
     for i in range(window_size, n_points):
-        # Get window data
         X_window = t[i-window_size:i].reshape(-1, 1)
         Y_window = y_obs[i-window_size:i]
 
-        # Update parameters
         result = estimator.update_parameters(X_window, Y_window, lengthscale=0.5)
 
-        # Simple prediction (use last value as proxy)
         predictions.append(y_obs[i-1])
         sigmas.append(result['sigma'])
 
@@ -631,17 +589,14 @@ if __name__ == "__main__":
     t_pred = t[window_size:]
     y_true_pred = y_true[window_size:]
 
-    # Visualize
     viz = DynamicMLEVisualizer()
 
-    # Plot 1: Predictions with CI
     fig1 = viz.plot_predictions_with_ci(
         t_pred, y_true_pred, predictions, sigmas,
         title="Dynamic MLE with Variance Inflation",
         save_path="dynamic_mle_example.png"
     )
 
-    # Plot 2: Sigma evolution
     sigma_raw, sigma_smoothed = estimator.get_sigma_history()
     fig2 = viz.plot_sigma_evolution(
         t_pred, sigma_raw, sigma_smoothed,

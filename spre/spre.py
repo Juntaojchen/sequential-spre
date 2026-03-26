@@ -9,18 +9,13 @@ Typical workflow
 ----------------
     sp = SPRE(kernel_spec='Matern3/2', dimension=1)
     sp.set_normalised_data(X, Y)           # max-min normalisation
-    # -- or --
     sp.set_normalised_data_mad(X, Y)       # MAD normalisation
 
-    # Option A: automatic basis selection
     result = sp.stepwise_selection()
-    # result = {'mu', 'var', 'cv', 'A', 'x', ...}
 
-    # Option B: fixed basis, optimise hyperparameters
     result = sp.perform_extrapolation_optimization(A)
     out    = sp.perform_extrapolation(result['x'], A, return_mu_and_var=True)
 
-    # Option C: fixed basis AND fixed hyperparameters
     out = sp.perform_extrapolation_fixed_hyperparams(
               amplitude=σ², lengthscale=ℓ, A=A)
 
@@ -69,7 +64,6 @@ class SPRE:
         self.dimension = dimension
         self._set_kernel(kernel_spec, gre_base)
 
-        # Data containers — populated by set_normalised_data*
         self.X_normalised: Optional[torch.Tensor] = None
         self.Y_normalised: Optional[torch.Tensor] = None
         self.nX:           Optional[torch.Tensor] = None
@@ -77,9 +71,6 @@ class SPRE:
         self.Y_mean:       float = 0.0
         self._use_mad:     bool  = False
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Kernel management
-    # ─────────────────────────────────────────────────────────────────────────
 
     def _set_kernel(
         self,
@@ -95,7 +86,6 @@ class SPRE:
 
         self.gre_base = gre_base
 
-        # Pre-compute default raw parameter vector
         spec_for_defaults = "GRE" if gre_base is not None else kernel_spec
         self.default_kernel_parameters: list = _kernel_default_params(
             spec_for_defaults,
@@ -128,9 +118,6 @@ class SPRE:
             gre_base_spec=self.kernel_base or "Gaussian",
         )
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Data normalisation
-    # ─────────────────────────────────────────────────────────────────────────
 
     def set_normalised_data(self, X, Y, use_mad: bool = False) -> None:
         """
@@ -159,9 +146,6 @@ class SPRE:
         """Convenience wrapper: MAD-based normalisation."""
         self.set_normalised_data(X, Y, use_mad=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Hyperparameter extraction / conversion
-    # ─────────────────────────────────────────────────────────────────────────
 
     def extract_hyperparameters(self, x: torch.Tensor) -> dict:
         """Return interpretable hyperparameters extracted from raw vector *x*."""
@@ -223,9 +207,6 @@ class SPRE:
         else:  # Gaussian, Matern1/2, Matern3/2, Matern5/2
             return torch.tensor([amp_raw, _inv(lengthscale)], dtype=torch.float64)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # LOOCV log-likelihood (public access)
-    # ─────────────────────────────────────────────────────────────────────────
 
     def cv_loss(self, x: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
         """
@@ -242,17 +223,11 @@ class SPRE:
         V = x2fx(self.X_normalised, A)
         return loocv_loss(K, V, self.Y_normalised)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Unisolvency check (backward-compat interface)
-    # ─────────────────────────────────────────────────────────────────────────
 
     def check_unisolvent(self, A: torch.Tensor) -> int:
         """Return 1 if A is unisolvent on the stored training data, -1 otherwise."""
         return 1 if check_unisolvent(self.X_normalised, A) else -1
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Hyperparameter optimisation
-    # ─────────────────────────────────────────────────────────────────────────
 
     def perform_extrapolation_optimization(
         self,
@@ -294,9 +269,6 @@ class SPRE:
             "cv": torch.tensor(-best_val, dtype=torch.float64),   # neg-ll
         }
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Prediction / extrapolation
-    # ─────────────────────────────────────────────────────────────────────────
 
     def perform_extrapolation(
         self,
@@ -360,9 +332,6 @@ class SPRE:
         out.update({"x": x_raw, "amplitude": amplitude, "lengthscale": lengthscale})
         return out
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Greedy stepwise basis selection
-    # ─────────────────────────────────────────────────────────────────────────
 
     def stepwise_selection(self) -> dict:
         """
@@ -383,7 +352,6 @@ class SPRE:
         if self.kernel_base is not None:
             return self._gre_stepwise()
 
-        # ── Standard SPRE stepwise ────────────────────────────────────────────
         def optimise_fn(A_: torch.Tensor):
             res = self.perform_extrapolation_optimization(A_)
             return res["x"], float(res["cv"].item())      # (x_opt, neg_ll)

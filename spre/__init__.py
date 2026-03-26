@@ -42,32 +42,23 @@ from .basis      import x2fx, softplus, stepwise
 from .selection  import stepwise_selection, check_unisolvent
 
 __all__ = [
-    # Orchestrator
     "SPRE",
-    # Baseline
     "mre",
-    # Kernels
     "eval_kernel",
     "default_params",
-    # Kriging / inference
     "loocv_loss",
     "reml_loss",
     "reml_sigma_mle",
     "kriging_predict",
-    # Optimisation
     "optimise_loocv",
-    # Extrapolation
     "predict_at_zero",
     "predict_normalised",
-    # Normalisation
     "normalise_maxmin",
     "normalise_mad",
     "denormalise",
-    # Basis utilities
     "x2fx",
     "softplus",
     "stepwise",
-    # Selection
     "stepwise_selection",
     "check_unisolvent",
 ]

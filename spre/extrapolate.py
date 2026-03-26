@@ -25,9 +25,6 @@ import torch
 from .basis import x2fx
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Low-level: posterior from pre-built blocks
-# ─────────────────────────────────────────────────────────────────────────────
 def predict_normalised(
     K_nn: torch.Tensor,
     V_n:  torch.Tensor,
@@ -80,9 +77,6 @@ def predict_normalised(
     return mu, var
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# High-level: predict at the origin in original scale
-# ─────────────────────────────────────────────────────────────────────────────
 def predict_at_zero(
     kernel_fn: Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
     x:         torch.Tensor,

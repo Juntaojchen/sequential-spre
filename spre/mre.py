@@ -57,7 +57,6 @@ def mre(
     n_train, d = X.shape
     m          = A.shape[0]
 
-    # ── 1. Select m nearest neighbours to the origin ──────────────────────────
     nbrs = NearestNeighbors(n_neighbors=m).fit(X.cpu().numpy())
     idx  = nbrs.kneighbors(
         np.zeros((1, d)), return_distance=False
@@ -66,7 +65,6 @@ def mre(
     X_sel = X[idx]    # (m, d)
     Y_sel = Y[idx]    # (m,)
 
-    # ── 2. Normalise (max-min, matching the JAX reference) ────────────────────
     ep  = 1e-16
     nX  = (X_sel.max(dim=0).values - X_sel.min(dim=0).values) + ep  # (d,)
     nY  = float((Y_sel.max() - Y_sel.min()).item()) + ep
@@ -74,13 +72,11 @@ def mre(
     Xn  = X_sel / nX
     Yn  = Y_sel / nY
 
-    # ── 3. Build polynomial system and solve ──────────────────────────────────
     V          = x2fx(Xn, A)                                         # (m, m)
     eval_point = x2fx(torch.zeros(1, d, dtype=torch.float64), A)     # (1, m)
 
     sol    = torch.linalg.lstsq(V, Yn.unsqueeze(1), driver="gelsd")
     coeffs = sol.solution                                             # (m, 1)
 
-    # ── 4. Evaluate at origin in original scale ───────────────────────────────
     mu = nY * (eval_point @ coeffs)   # (1, 1)
     return mu.view(())                # scalar

@@ -43,9 +43,6 @@ import torch
 from .constants import EPSILON, JITTER
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Augmented Kriging system
-# ─────────────────────────────────────────────────────────────────────────────
 def _augmented_system(K: torch.Tensor, V: torch.Tensor) -> torch.Tensor:
     """
     Build the augmented Kriging matrix:
@@ -78,9 +75,6 @@ def _chol_solve(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
     return torch.cholesky_solve(B, L)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. LOOCV  (Dubrule 1983)
-# ─────────────────────────────────────────────────────────────────────────────
 def loocv_loss(
     K: torch.Tensor,
     V: torch.Tensor,
@@ -115,21 +109,17 @@ def loocv_loss(
     n, m = V.shape
     Y_col = Y.view(-1, 1)                                      # (n, 1)
 
-    # Augmented system with diagonal stabilisation
     M     = _augmented_system(K, V)                            # (n+m, n+m)
     M_reg = M + JITTER * torch.eye(n + m, dtype=K.dtype, device=K.device)
     M_inv = torch.linalg.inv(M_reg)
 
-    # Solve M [α; β] = [y; 0]
     Y_aug   = torch.cat([Y_col, torch.zeros(m, 1, dtype=K.dtype)], dim=0)
     alpha   = (M_inv @ Y_aug)[:n]                             # (n, 1)
     diag_M  = torch.diagonal(M_inv)[:n]                       # (n,)
 
-    # Dubrule LOOCV statistics
     residuals = alpha.flatten() / diag_M                      # rᵢ = αᵢ / [M⁻¹]ᵢᵢ
     variances = torch.clamp(1.0 / diag_M, min=1e-14)          # σ̂²ᵢ
 
-    # LOO log-likelihood
     log_ll = (
         -0.5 * torch.log(2 * math.pi * variances)
         - 0.5 * (residuals ** 2) / variances
@@ -138,9 +128,6 @@ def loocv_loss(
     return log_ll
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. REML  (Patterson & Thompson 1971)
-# ─────────────────────────────────────────────────────────────────────────────
 def reml_loss(
     K: torch.Tensor,
     V: torch.Tensor,
@@ -171,7 +158,6 @@ def reml_loss(
     n, m = V.shape
     Y = Y.view(-1, 1).to(torch.float64)
 
-    # Cholesky of K
     try:
         L_K = torch.linalg.cholesky(K)
     except RuntimeError:
@@ -179,11 +165,9 @@ def reml_loss(
 
     log_det_K = 2.0 * torch.log(torch.diag(L_K)).sum()
 
-    # K⁻¹ Y  and  K⁻¹ V
     K_inv_Y = torch.cholesky_solve(Y, L_K)            # (n, 1)
     K_inv_V = torch.cholesky_solve(V, L_K)            # (n, m)
 
-    # Vᵀ K⁻¹ V
     VtKinvV = V.T @ K_inv_V                           # (m, m)
     jitter_vkv = max(JITTER,
                      1e-8 * torch.trace(VtKinvV).abs().item() / m) if m > 0 else JITTER
@@ -197,7 +181,6 @@ def reml_loss(
 
     log_det_VKV = 2.0 * torch.log(torch.diag(L_VKV)).sum()
 
-    # yᵀ P y = yᵀ K⁻¹ y − (Vᵀ K⁻¹ y)ᵀ (Vᵀ K⁻¹ V)⁻¹ (Vᵀ K⁻¹ y)
     VtKinvY    = V.T @ K_inv_Y                                       # (m, 1)
     VKV_inv_VKY = torch.cholesky_solve(VtKinvY, L_VKV)              # (m, 1)
     ytKinvy    = (Y.T @ K_inv_Y).squeeze()                           # scalar
@@ -213,9 +196,6 @@ def reml_loss(
     return log_reml
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. Closed-form REML amplitude estimate
-# ─────────────────────────────────────────────────────────────────────────────
 def reml_sigma_mle(
     K_unit: torch.Tensor,
     V:      torch.Tensor,
@@ -273,9 +253,6 @@ def reml_sigma_mle(
     return torch.clamp(sigma_sq, min=EPSILON)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. GP posterior at a query point  (used for prediction at h=0)
-# ─────────────────────────────────────────────────────────────────────────────
 def kriging_predict(
     K_nn:  torch.Tensor,
     V_n:   torch.Tensor,
@@ -322,11 +299,8 @@ def kriging_predict(
     var = (self_k := (k_sn @ K_inv @ k_sn.T)) * 0        # placeholder, computed below
     k_ss_scalar = torch.zeros(1, 1, dtype=K_nn.dtype)     # k(s,s) filled by caller
 
-    # Compute variance without k(s,s) term; caller adds it
     var_partial = -(k_sn @ K_inv @ k_sn.T) + r.T @ B @ r
 
-    # Caller must pass k_ss via the kernel; here we return the partial form
-    # so that the caller adds k_ss.  This matches cv_loss_calculation in SPRE.py.
     var = var_partial  # sign: cov = k_ss + var_partial; caller handles k_ss separately
 
     cov = k_ss_scalar + var_partial

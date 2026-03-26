@@ -10,7 +10,6 @@ def SPRE_opt(A, X, Y, k_name, training_iter=100, lr=0.1):
     L-BFGS is much closer to JAX's scipy.minimize(method='BFGS').
     """
 
-    # --- 1. Data Prep ---
     if not torch.is_tensor(A): A = torch.tensor(A)
     if not torch.is_tensor(X): X = torch.tensor(X)
     if not torch.is_tensor(Y): Y = torch.tensor(Y)
@@ -26,15 +25,12 @@ def SPRE_opt(A, X, Y, k_name, training_iter=100, lr=0.1):
     X_norm = X / nX
     Y_norm = Y / nY
     
-    # --- 2. Model Setup ---
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     model = SPREModel(X_norm, Y_norm, likelihood, A, k_name)
     
     model.train()
     likelihood.train()
     
-    # --- 3. Optimization (Switched to LBFGS) ---
-    # LBFGS requires a 'closure' function to re-evaluate the loss
     optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1, max_iter=50)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     
@@ -47,13 +43,10 @@ def SPRE_opt(A, X, Y, k_name, training_iter=100, lr=0.1):
         loss.backward()
         return loss
 
-    # LBFGS steps automatically handle multiple iterations internally
-    # But we wrap it in a small loop to ensure convergence
     for i in range(100): # usually converges very fast
         loss = optimizer.step(closure)
         final_loss = loss.item()
         
-    # --- 4. Return ---
     return {
         'model': model,
         'likelihood': likelihood,

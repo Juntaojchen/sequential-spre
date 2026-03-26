@@ -40,9 +40,6 @@ from .basis     import softplus, x2fx
 from .utils     import cellsum
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Pairwise distance
-# ─────────────────────────────────────────────────────────────────────────────
 def cdist(XA: torch.Tensor, XB: torch.Tensor) -> torch.Tensor:
     """
     Pairwise Euclidean distances between rows of XA and XB.
@@ -67,9 +64,6 @@ def cdist(XA: torch.Tensor, XB: torch.Tensor) -> torch.Tensor:
     return torch.sqrt(torch.clamp(XA_sq - 2 * cross + XB_sq, min=0.0))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Individual kernel functions  (pure functions, no state)
-# ─────────────────────────────────────────────────────────────────────────────
 def gaussian(X1: torch.Tensor, X2: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """
     Radial basis function (RBF / squared-exponential) kernel.
@@ -205,7 +199,6 @@ def gre(X1: torch.Tensor, X2: torch.Tensor, x: torch.Tensor,
     """
     amp_gre = EPSILON + softplus(x[0])
 
-    # Polynomial rate function: b(x_i) = Σ_j φ_j(x_i)
     b_X1 = x2fx(X1, B).sum(dim=1)   # (n1,)
     b_X2 = x2fx(X2, B).sum(dim=1)   # (n2,)
 
@@ -214,9 +207,6 @@ def gre(X1: torch.Tensor, X2: torch.Tensor, x: torch.Tensor,
     return amp_gre * b_X1.unsqueeze(1) * K_base * b_X2.unsqueeze(0)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Default raw parameters by kernel name
-# ─────────────────────────────────────────────────────────────────────────────
 def default_params(kernel_spec: str, dimension: int = 1,
                    gre_base: Optional[torch.Tensor] = None) -> List[float]:
     """
@@ -252,7 +242,6 @@ def default_params(kernel_spec: str, dimension: int = 1,
     elif kernel_spec == "white":
         return [A]
     elif kernel_spec == "GRE":
-        # One extra amplitude for GRE on top of the base kernel parameters
         base_spec = "Gaussian"  # default base; caller can override
         base = default_params(base_spec, dimension)
         return [A] + base
@@ -260,9 +249,6 @@ def default_params(kernel_spec: str, dimension: int = 1,
         raise ValueError(f"Unknown kernel specification: '{kernel_spec}'")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Dispatcher
-# ─────────────────────────────────────────────────────────────────────────────
 def eval_kernel(
     kernel_spec: str,
     X1: torch.Tensor,
